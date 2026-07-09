@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.625rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom theme colors */
+    --yt-primary: #1683ff;
+    --yt-primary-hover: #4096ff;
+    --yt-primary-active: #0a68d8;
+    --yt-bg-page: #000000;
+    --yt-bg-card: #070707;
+    --yt-bg-subtle: #101010;
+    --yt-text-primary: rgba(255, 255, 255, 0.94);
+    --yt-text-secondary: rgba(255, 255, 255, 0.68);
+    --yt-text-muted: rgba(255, 255, 255, 0.44);
+    --yt-text-placeholder: rgba(255, 255, 255, 0.32);
+    --yt-border: #242424;
+    --yt-error: #ff7875;
+    --yt-error-bg: #211111;
+    --yt-success: #40c463;
+    --yt-success-bg: #0d1d11;
+    --yt-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --yt-shadow-card-hover: 0 14px 32px rgba(0, 0, 0, 0.45);
+    --yt-shadow-float: 0 18px 45px rgba(0, 0, 0, 0.55);
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --yt-primary: #1683ff;
+    --yt-primary-hover: #4096ff;
+    --yt-primary-active: #0a68d8;
+    --yt-bg-page: #000000;
+    --yt-bg-card: #070707;
+    --yt-bg-subtle: #101010;
+    --yt-text-primary: rgba(255, 255, 255, 0.94);
+    --yt-text-secondary: rgba(255, 255, 255, 0.68);
+    --yt-text-muted: rgba(255, 255, 255, 0.46);
+    --yt-text-placeholder: rgba(255, 255, 255, 0.34);
+    --yt-border: #242424;
+    --yt-error: #FF7875;
+    --yt-error-bg: #2A1719;
+    --yt-success: #73D13D;
+    --yt-success-bg: #162312;
+    --yt-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.24);
+    --yt-shadow-card-hover: 0 8px 22px rgba(0, 0, 0, 0.34);
+    --yt-shadow-float: 0 12px 30px rgba(0, 0, 0, 0.38);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--yt-bg-page);
+    color: var(--yt-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Chevron scroll-down animation */
+@keyframes chevronFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Skeleton loading pulse */
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .chevron-anim-1 {
+    animation: chevronFadeSlide 1200ms ease-in-out 0ms infinite;
+  }
+  .chevron-anim-2 {
+    animation: chevronFadeSlide 1200ms ease-in-out 200ms infinite;
+  }
+  .chevron-anim-3 {
+    animation: chevronFadeSlide 1200ms ease-in-out 400ms infinite;
+  }
+  .skeleton-pulse {
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+  }
+}
+
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}

@@ -372,6 +372,60 @@ function playlistVideoFromRenderer(renderer, fallbackIndex) {
   };
 }
 
+async function getVideoMetadata(videoId, fallbackIndex = 1) {
+  try {
+    const html = await fetchText(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`);
+    const playerResponse = extractJsonAssignment(html, 'ytInitialPlayerResponse');
+    const details = playerResponse?.videoDetails || {};
+    return {
+      id: videoId,
+      playlistIndex: fallbackIndex,
+      title: details.title || `Video ${videoId}`,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      channel: details.author || 'YouTube',
+      thumbnail:
+        details.thumbnail?.thumbnails?.at(-1)?.url ||
+        `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    };
+  } catch {
+    return {
+      id: videoId,
+      playlistIndex: fallbackIndex,
+      title: `Video ${videoId}`,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      channel: 'YouTube',
+      thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    };
+  }
+}
+
+async function addTranscriptToTableVideo(video, language, playlist) {
+  try {
+    const result = await getVideoTranscript(video, language, playlist);
+    if (result.skipped) {
+      return {
+        ...video,
+        title: result.title || video.title,
+        transcriptError: result.reason,
+      };
+    }
+
+    return {
+      ...video,
+      title: result.title || video.title,
+      channel: result.channel || video.channel,
+      thumbnail: result.thumbnail || video.thumbnail,
+      transcript: result.fullText,
+      transcriptLanguage: result.language,
+    };
+  } catch (error) {
+    return {
+      ...video,
+      transcriptError: formatError(error),
+    };
+  }
+}
+
 function playlistVideoFromLockup(lockup, fallbackIndex) {
   const endpoint = lockup?.rendererContext?.commandContext?.onTap?.innertubeCommand?.watchEndpoint;
   const id = endpoint?.videoId || lockup?.contentId;
@@ -827,28 +881,83 @@ async function extractAll(input, language, onProgress) {
   return { transcripts, skipped };
 }
 
-async function extractPlaylists(input, onProgress) {
+async function attachTableTranscripts(playlists, language, onProgress) {
+  const totalVideos = playlists.reduce((sum, playlist) => sum + playlist.videos.length, 0);
+  let processedVideos = 0;
+
+  for (const playlist of playlists) {
+    for (let index = 0; index < playlist.videos.length; index += 1) {
+      const video = playlist.videos[index];
+      onProgress?.({
+        phase: 'Extracting table transcripts',
+        playlistTitle: playlist.title,
+        currentTitle: video.title,
+        processed: processedVideos,
+        total: totalVideos,
+        message: `Processing transcript ${processedVideos + 1} of ${totalVideos}`,
+      });
+
+      playlist.videos[index] = await addTranscriptToTableVideo(video, language, playlist);
+      processedVideos += 1;
+
+      onProgress?.({
+        phase: 'Extracting table transcripts',
+        playlistTitle: playlist.title,
+        currentTitle: playlist.videos[index].title,
+        processed: processedVideos,
+        total: totalVideos,
+        message: `Processed ${processedVideos} of ${totalVideos} transcripts`,
+      });
+    }
+  }
+}
+
+async function extractPlaylists(input, options = {}, onProgress) {
+  if (typeof options === 'function') {
+    onProgress = options;
+    options = {};
+  }
+
+  const includeTranscripts = Boolean(options.includeTranscripts);
+  const language = options.language || 'all';
   const items = splitInput(input);
   if (!items.length) {
-    throw new Error('Please enter at least one YouTube playlist URL.');
+    throw new Error('Please enter at least one YouTube video or playlist URL.');
   }
 
   const playlists = [];
+  const individualVideos = [];
   const skipped = [];
   let completedVideos = 0;
   let totalVideos = null;
 
   onProgress?.({
-    phase: 'Reading playlists',
+    phase: 'Reading video sources',
     processed: 0,
     total: null,
-    message: 'Checking playlist URLs...',
+    message: 'Checking YouTube URLs...',
   });
 
   for (const item of items) {
     const parsed = parseYouTubeUrl(item);
-    if (!parsed || parsed.type !== 'playlist') {
-      skipped.push({ title: item, reason: 'Invalid YouTube playlist URL.' });
+    if (!parsed) {
+      skipped.push({ title: item, reason: 'Invalid YouTube URL.' });
+      continue;
+    }
+
+    if (parsed.type === 'video') {
+      onProgress?.({
+        phase: 'Reading video details',
+        currentTitle: parsed.id,
+        processed: completedVideos,
+        total: totalVideos,
+        message: `Reading video ${parsed.id}`,
+      });
+
+      const video = await getVideoMetadata(parsed.id, individualVideos.length + 1);
+      individualVideos.push(video);
+      completedVideos += 1;
+      totalVideos = totalVideos === null ? completedVideos : Math.max(totalVideos, completedVideos);
       continue;
     }
 
@@ -899,9 +1008,26 @@ async function extractPlaylists(input, onProgress) {
     });
   }
 
+  if (individualVideos.length) {
+    playlists.push({
+      id: 'individual-videos',
+      title: 'Individual videos',
+      expectedVideoCount: individualVideos.length,
+      capturedVideoCount: individualVideos.length,
+      isComplete: true,
+      warning: null,
+      verificationMessage: `Captured ${individualVideos.length} individual video${individualVideos.length === 1 ? '' : 's'}.`,
+      videos: individualVideos,
+    });
+  }
+
   if (!playlists.length) {
     const reason = skipped[0]?.reason ? ` ${skipped[0].reason}` : '';
-    throw new Error(`No playlist videos could be fetched.${reason}`);
+    throw new Error(`No YouTube videos could be fetched.${reason}`);
+  }
+
+  if (includeTranscripts) {
+    await attachTableTranscripts(playlists, language, onProgress);
   }
 
   return { playlists, skipped };
@@ -952,14 +1078,26 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && req.url === '/api/playlists') {
       const body = await readJsonBody(req);
-      const data = await extractPlaylists(body.input || body.url);
+      const data = await extractPlaylists(body.input || body.url, {
+        includeTranscripts: body.includeTranscripts,
+        language: body.language || 'all',
+      });
       sendJson(res, 200, data);
       return;
     }
 
     if (req.method === 'POST' && req.url === '/api/playlists/start') {
       const body = await readJsonBody(req);
-      const jobId = startJob((onProgress) => extractPlaylists(body.input || body.url, onProgress));
+      const jobId = startJob((onProgress) =>
+        extractPlaylists(
+          body.input || body.url,
+          {
+            includeTranscripts: body.includeTranscripts,
+            language: body.language || 'all',
+          },
+          onProgress
+        )
+      );
       sendJson(res, 202, { jobId });
       return;
     }

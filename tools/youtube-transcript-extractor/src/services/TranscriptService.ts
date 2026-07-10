@@ -4,6 +4,7 @@ import type {
   LanguageCode,
   PlaylistExport,
   PlaylistExportFormat,
+  PlaylistTableColumnId,
   Transcript,
   TranscriptFormat,
 } from '@/types';
@@ -26,9 +27,20 @@ interface PlaylistResponse {
   }>;
 }
 
+interface PlaylistColumnDef {
+  id: PlaylistTableColumnId;
+  label: string;
+  getValue: (playlist: PlaylistExport, video: PlaylistExport['videos'][number], includeIndexInTitles: boolean) => string;
+}
+
 interface StartJobResponse {
   jobId: string;
 }
+
+const INVALID_PATH_CHARS = new RegExp(
+  `[<>:"/\\\\|?*${String.fromCharCode(0)}-${String.fromCharCode(31)}]`,
+  'g'
+);
 
 function splitInput(input: string): string[] {
   return input
@@ -39,7 +51,7 @@ function splitInput(input: string): string[] {
 
 function sanitizePathPart(value: string, fallback: string): string {
   return (value || fallback)
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(INVALID_PATH_CHARS, '_')
     .replace(/\s+/g, ' ')
     .trim()
     .substring(0, 90) || fallback;
@@ -83,6 +95,32 @@ function csvCell(value: string | number | null | undefined): string {
   return text;
 }
 
+const PLAYLIST_COLUMNS: PlaylistColumnDef[] = [
+  { id: 'playlist', label: 'Playlist', getValue: (playlist) => playlist.title },
+  { id: 'playlistId', label: 'Playlist ID', getValue: (playlist) => playlist.id },
+  { id: 'index', label: 'Index', getValue: (_playlist, video) => String(video.playlistIndex) },
+  {
+    id: 'title',
+    label: 'Title',
+    getValue: (_playlist, video, includeIndexInTitles) =>
+      includeIndexInTitles ? prefixTitleWithIndex(video.title, video.playlistIndex) : video.title,
+  },
+  { id: 'link', label: 'Link', getValue: (_playlist, video) => video.url },
+  { id: 'channel', label: 'Channel', getValue: (_playlist, video) => video.channel },
+  {
+    id: 'transcript',
+    label: 'Transcript',
+    getValue: (_playlist, video) => video.transcript || video.transcriptError || '',
+  },
+];
+
+function normalisePlaylistColumns(columns: PlaylistTableColumnId[]): PlaylistTableColumnId[] {
+  const unique = columns.filter((column, index) => columns.indexOf(column) === index);
+  const allowed = new Set(PLAYLIST_COLUMNS.map((column) => column.id));
+  const selected = unique.filter((column) => allowed.has(column));
+  return selected.length ? selected : ['title', 'link'];
+}
+
 function xmlEscape(value: string | number | null | undefined): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -90,6 +128,13 @@ function xmlEscape(value: string | number | null | undefined): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+function xlsxCellValue(value: string | number | null | undefined): string {
+  const text = String(value ?? '');
+  const maxExcelCellLength = 32767;
+  if (text.length <= maxExcelCellLength) return text;
+  return `${text.slice(0, 32720)}\n[Transcript truncated for Excel cell limit. Use CSV for the full text.]`;
 }
 
 function columnName(index: number): string {
@@ -291,20 +336,22 @@ export class TranscriptService {
 
   async fetchPlaylists(
     input: string,
+    includeTranscripts: boolean,
+    language: LanguageCode,
     onProgress?: (progress: JobProgress) => void
   ): Promise<PlaylistExport[]> {
     if (!input.trim()) {
-      throw new Error('Please enter at least one YouTube playlist URL.');
+      throw new Error('Please enter at least one YouTube video or playlist URL.');
     }
 
     const data = await this.runJob<PlaylistResponse>(
       '/api/playlists/start',
-      { input },
+      { input, includeTranscripts, language },
       onProgress
     );
 
     if (!data.playlists?.length) {
-      throw new Error('No playlist videos were found for the supplied URL(s).');
+      throw new Error('No YouTube videos were found for the supplied URL(s).');
     }
 
     return data.playlists;
@@ -445,9 +492,10 @@ export class TranscriptService {
   exportPlaylistTable(
     playlists: PlaylistExport[],
     format: PlaylistExportFormat,
+    selectedColumns: PlaylistTableColumnId[],
     includeIndexInTitles: boolean
   ): Promise<Blob> | Blob {
-    const rows = this.getPlaylistRows(playlists, includeIndexInTitles);
+    const rows = this.getPlaylistRows(playlists, selectedColumns, includeIndexInTitles);
 
     if (format === 'md') {
       return this.exportPlaylistMarkdown(playlists, rows);
@@ -461,7 +509,7 @@ export class TranscriptService {
   }
 
   getPlaylistExportName(format: PlaylistExportFormat): string {
-    return `youtube_playlist_videos_${Date.now()}.${format}`;
+    return `youtube_video_table_${Date.now()}.${format}`;
   }
 
   getPlaylistExportSummary(playlists: PlaylistExport[]): string {
@@ -470,27 +518,31 @@ export class TranscriptService {
     const verifiedCount = playlists.filter((playlist) => playlist.isComplete).length;
     const partialCount = playlistCount - verifiedCount;
 
-    return `Downloaded ${videoCount} captured video link${videoCount === 1 ? '' : 's'} from ${playlistCount} playlist${playlistCount === 1 ? '' : 's'} (${verifiedCount}/${playlistCount} verified complete${partialCount ? `, ${partialCount} partial` : ''}).`;
+    const transcriptCount = playlists.reduce(
+      (sum, playlist) => sum + playlist.videos.filter((video) => video.transcript).length,
+      0
+    );
+    const transcriptText = transcriptCount
+      ? ` with ${transcriptCount} transcript${transcriptCount === 1 ? '' : 's'}`
+      : '';
+
+    return `Downloaded ${videoCount} captured video link${videoCount === 1 ? '' : 's'}${transcriptText} from ${playlistCount} source${playlistCount === 1 ? '' : 's'} (${verifiedCount}/${playlistCount} verified complete${partialCount ? `, ${partialCount} partial` : ''}).`;
   }
 
-  private getPlaylistRows(playlists: PlaylistExport[], includeIndexInTitles: boolean): string[][] {
-    const headers = includeIndexInTitles
-      ? ['Playlist', 'Playlist ID', 'Index', 'Title', 'Link', 'Channel']
-      : ['Playlist', 'Playlist ID', 'Title', 'Link', 'Channel'];
+  private getPlaylistRows(
+    playlists: PlaylistExport[],
+    selectedColumns: PlaylistTableColumnId[],
+    includeIndexInTitles: boolean
+  ): string[][] {
+    const columns = normalisePlaylistColumns(selectedColumns)
+      .map((columnId) => PLAYLIST_COLUMNS.find((column) => column.id === columnId))
+      .filter((column): column is PlaylistColumnDef => Boolean(column));
+    const headers = columns.map((column) => column.label);
     const rows = [headers];
 
     playlists.forEach((playlist) => {
       playlist.videos.forEach((video) => {
-        const title = includeIndexInTitles
-          ? prefixTitleWithIndex(video.title, video.playlistIndex)
-          : video.title;
-        const baseRow = [playlist.title, playlist.id];
-
-        rows.push(
-          includeIndexInTitles
-            ? [...baseRow, String(video.playlistIndex), title, video.url, video.channel]
-            : [...baseRow, title, video.url, video.channel]
-        );
+        rows.push(columns.map((column) => column.getValue(playlist, video, includeIndexInTitles)));
       });
     });
 
@@ -532,7 +584,7 @@ export class TranscriptService {
       const style = rowIndex === 0 ? ' s="1"' : '';
       const cells = row.map((cell, cellIndex) => {
         const ref = `${columnName(cellIndex + 1)}${rowIndex + 1}`;
-        return `<c r="${ref}" t="inlineStr"${style}><is><t>${xmlEscape(cell)}</t></is></c>`;
+        return `<c r="${ref}" t="inlineStr"${style}><is><t>${xmlEscape(xlsxCellValue(cell))}</t></is></c>`;
       }).join('');
 
       return `<row r="${rowIndex + 1}">${cells}</row>`;
@@ -541,6 +593,7 @@ export class TranscriptService {
     const lastRow = Math.max(rows.length, 1);
     const widths = rows[0]?.map((header) => {
       if (header === 'Title' || header === 'Link') return 54;
+      if (header === 'Transcript') return 72;
       if (header === 'Playlist') return 28;
       if (header === 'Index') return 10;
       if (header === 'Channel') return 24;

@@ -15,9 +15,9 @@ const DEFAULT_PLAYLIST_COLUMNS: PlaylistTableColumnId[] = ['playlist', 'index', 
 
 const initialState: AppState = {
   url: '',
-  language: 'all',
+  language: 'en',
   format: 'txt',
-  playlistExportFormat: 'md',
+  playlistExportFormat: 'xlsx',
   includeIndexInTitles: false,
   isLoading: false,
   isPlaylistExporting: false,
@@ -67,7 +67,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isPlaylistExporting: true,
         playlistExportProgress: {
           phase: 'Starting',
-          message: 'Preparing playlist link export...',
+          message: 'Preparing video table export...',
           processed: 0,
           total: null,
         },

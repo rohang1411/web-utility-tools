@@ -21,6 +21,7 @@ const COLUMNS: ColumnDef[] = [
   { id: 'title', label: 'Title', getValue: (_playlist, video) => video.title },
   { id: 'link', label: 'Link', getValue: (_playlist, video) => video.url },
   { id: 'channel', label: 'Channel', getValue: (_playlist, video) => video.channel },
+  { id: 'transcript', label: 'Transcript', getValue: (_playlist, video) => video.transcript || video.transcriptError || '' },
 ];
 
 function tsvCell(value: string): string {
@@ -106,38 +107,37 @@ export default function PlaylistTablePreview({
   };
 
   return (
-    <section className="bg-black px-6 pb-8">
-      <div className="mx-auto max-w-[1180px] rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-card)]">
+    <section className="bg-[var(--yt-bg-page)] px-5 pb-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1180px] overflow-hidden rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-card)] shadow-[var(--yt-shadow-card)] backdrop-blur-xl">
         <div className="flex flex-col gap-4 border-b border-[var(--yt-border)] p-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <Columns3 size={17} className="text-[#1683ff]" />
-              Copyable playlist table
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--yt-text-primary)]">
+              <Columns3 size={17} className="text-[var(--yt-success)]" />
+              Video table
             </div>
-            <p className="mt-1 text-sm text-[var(--yt-text-secondary)]">
-              {totalVideos} captured video link{totalVideos === 1 ? '' : 's'} across {playlists.length} playlist{playlists.length === 1 ? '' : 's'}.
-              {' '}Copy uses spreadsheet-ready columns for Excel or Google Sheets.
+            <p className="mt-1 text-sm text-[var(--yt-text-muted)]">
+              {totalVideos} videos, {playlists.length} source{playlists.length === 1 ? '' : 's'}.
             </p>
           </div>
 
           <button
             onClick={handleCopy}
             disabled={!rows.length}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-black transition-colors hover:bg-[#dcecff] disabled:cursor-not-allowed disabled:opacity-50"
+            className="yt-primary-action !min-h-10 !w-auto px-4 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copied ? <Check size={16} /> : <ClipboardCopy size={16} />}
-            {copied ? 'Copied for Excel' : 'Copy table for Excel'}
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
 
         {warnings.length > 0 && (
-          <div className="border-b border-[var(--yt-border)] bg-[#1e1500] px-5 py-3">
+          <div className="border-b border-[var(--yt-border)] bg-[var(--yt-error-bg)] px-5 py-3">
             {warnings.map((playlist) => (
-              <div key={playlist.id} className="flex gap-2 text-sm text-[#ffd666]">
+              <div key={playlist.id} className="flex gap-2 text-sm text-[var(--yt-text-secondary)]">
                 <TriangleAlert size={16} className="mt-0.5 flex-none" />
                 <span>
                   {playlist.title}: captured {playlist.capturedVideoCount}
-                  {playlist.expectedVideoCount ? ` of ${playlist.expectedVideoCount}` : ''} videos. The downloaded file and table include the captured rows.
+                  {playlist.expectedVideoCount ? ` of ${playlist.expectedVideoCount}` : ''} videos.
                 </span>
               </div>
             ))}
@@ -152,11 +152,7 @@ export default function PlaylistTablePreview({
                 <button
                   key={column.id}
                   onClick={() => handleToggleColumn(column.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    active
-                      ? 'border-[#1683ff] bg-[#08284d] text-white'
-                      : 'border-[var(--yt-border)] bg-black text-[var(--yt-text-secondary)] hover:text-white'
-                  }`}
+                  className={`yt-column-pill ${active ? 'is-active' : ''}`}
                 >
                   {column.label}
                 </button>
@@ -167,7 +163,7 @@ export default function PlaylistTablePreview({
 
         <div className="max-h-[520px] overflow-auto">
           <table className="min-w-full table-fixed text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-[#0d0d0d] text-xs uppercase tracking-wide text-[var(--yt-text-muted)]">
+            <thead className="sticky top-0 z-10 bg-[var(--yt-bg-page)] text-xs uppercase tracking-[0.18em] text-[var(--yt-text-muted)]">
               <tr>
                 {visibleColumns.map((column) => (
                   <th key={column.id} className="border-b border-[var(--yt-border)] px-4 py-3 font-semibold">
@@ -179,11 +175,18 @@ export default function PlaylistTablePreview({
             <tbody>
               {playlists.flatMap((playlist) =>
                 playlist.videos.map((video) => (
-                  <tr key={`${playlist.id}-${video.playlistIndex}-${video.id}`} className="border-b border-[var(--yt-border)]/70 hover:bg-[var(--yt-bg-subtle)]">
+                  <tr key={`${playlist.id}-${video.playlistIndex}-${video.id}`} className="border-b border-[var(--yt-border)] hover:bg-[var(--yt-bg-subtle)]">
                     {visibleColumns.map((column) => (
-                      <td key={column.id} className="max-w-[360px] truncate px-4 py-3 text-[var(--yt-text-secondary)]">
+                      <td
+                        key={column.id}
+                        className={`px-4 py-3 text-[var(--yt-text-secondary)] ${
+                          column.id === 'transcript'
+                            ? 'max-w-[520px] truncate'
+                            : 'max-w-[360px] truncate'
+                        }`}
+                      >
                         {column.id === 'link' ? (
-                          <a href={video.url} target="_blank" rel="noreferrer" className="text-[#69b1ff] hover:text-white">
+                          <a href={video.url} target="_blank" rel="noreferrer" className="text-[var(--yt-success)] hover:text-[var(--yt-text-primary)]">
                             {column.getValue(playlist, video)}
                           </a>
                         ) : (

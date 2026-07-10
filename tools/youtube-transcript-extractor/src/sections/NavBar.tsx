@@ -1,47 +1,53 @@
-import { FileDown, Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
+import { ArrowLeft, Moon, Sun } from 'lucide-react';
+
+type Theme = 'dark' | 'light';
 
 export default function NavBar() {
-  const scrollTo = (target: string) => {
-    document.querySelector(target)?.scrollIntoView({ behavior: 'smooth' });
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return (localStorage.getItem('theme') as Theme | null) ?? 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-[var(--yt-border)] bg-black/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-6">
-        <button
-          onClick={() => scrollTo('#home')}
-          className="flex items-center gap-3 text-left"
+    <nav className="sticky top-0 z-50 border-b border-[var(--yt-border)] bg-[var(--yt-bg-page)] backdrop-blur-2xl">
+      <div className="mx-auto flex h-14 max-w-[1180px] items-center justify-between px-5 sm:px-6 lg:px-8">
+        <Link
+          to="/"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--yt-control-border)] bg-[var(--yt-nav-button-bg)] text-[var(--yt-nav-button-text)] transition hover:opacity-90"
+          aria-label="All tools"
+          title="All tools"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1683ff] text-white">
-            <Play size={17} fill="currentColor" />
-          </span>
-          <span>
-            <span className="block text-sm font-semibold text-white">Transcript Extractor</span>
-            <span className="block text-[11px] text-[var(--yt-text-muted)]">Batch YouTube exports</span>
-          </span>
+          <ArrowLeft size={16} />
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => document.querySelector('#home')?.scrollIntoView({ behavior: 'smooth' })}
+          className="text-[12px] font-medium uppercase tracking-[0.34em] text-[var(--yt-text-muted)]"
+        >
+          Transcript Extractor
         </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => scrollTo('#home')}
-            className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[var(--yt-text-secondary)] hover:bg-[var(--yt-bg-card)] hover:text-white sm:inline-flex"
-          >
-            Extractors
-          </button>
-          <button
-            onClick={() => scrollTo('#transcripts')}
-            className="hidden rounded-lg px-3 py-2 text-sm font-medium text-[var(--yt-text-secondary)] hover:bg-[var(--yt-bg-card)] hover:text-white sm:inline-flex"
-          >
-            Results
-          </button>
-          <button
-            onClick={() => scrollTo('#home')}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-card)] px-3 text-sm font-semibold text-white hover:border-[#1683ff]"
-          >
-            <FileDown size={15} />
-            Export
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--yt-control-border)] bg-[var(--yt-nav-button-bg)] text-[var(--yt-nav-button-text)] transition hover:opacity-90"
+          aria-label={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
+          title={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
       </div>
     </nav>
   );

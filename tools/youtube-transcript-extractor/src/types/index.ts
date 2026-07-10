@@ -30,6 +30,9 @@ export interface PlaylistVideo {
   url: string;
   channel: string;
   thumbnail?: string;
+  transcript?: string;
+  transcriptLanguage?: string;
+  transcriptError?: string;
 }
 
 export interface PlaylistExport {
@@ -43,7 +46,14 @@ export interface PlaylistExport {
   videos: PlaylistVideo[];
 }
 
-export type PlaylistTableColumnId = 'playlist' | 'playlistId' | 'index' | 'title' | 'link' | 'channel';
+export type PlaylistTableColumnId =
+  | 'playlist'
+  | 'playlistId'
+  | 'index'
+  | 'title'
+  | 'link'
+  | 'channel'
+  | 'transcript';
 
 export interface JobProgress {
   phase: string;

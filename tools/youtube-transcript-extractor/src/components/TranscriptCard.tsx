@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Download } from 'lucide-react';
 import type { Transcript } from '@/types';
 import { TranscriptService, downloadFile } from '@/services/TranscriptService';
 
@@ -20,10 +21,9 @@ export default function TranscriptCard({ transcript, includeIndexInTitles }: Tra
   const [exportOpen, setExportOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+    function handleClick(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setExportOpen(false);
       }
     }
@@ -44,87 +44,77 @@ export default function TranscriptCard({ transcript, includeIndexInTitles }: Tra
   };
 
   return (
-    <div className="rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-card)] p-4 shadow-[var(--yt-shadow-card)] transition-shadow hover:shadow-[var(--yt-shadow-card-hover)]">
-      {/* Thumbnail */}
-      <div className="aspect-video w-full overflow-hidden rounded-lg bg-[var(--yt-bg-subtle)]">
+    <article className="group overflow-hidden rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-card)] shadow-[var(--yt-shadow-card)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-[var(--yt-shadow-card-hover)]">
+      <div className="aspect-video w-full overflow-hidden bg-[var(--yt-bg-subtle)]">
         <img
           src={transcript.thumbnail}
           alt={transcript.title}
           loading="lazy"
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
+          className="h-full w-full object-cover opacity-[0.86] transition duration-500 group-hover:scale-[1.015] group-hover:opacity-100"
+          onError={(event) => {
+            (event.target as HTMLImageElement).style.display = 'none';
           }}
         />
       </div>
 
-      {/* Video Title */}
-      <h3 className="mt-3 text-base font-medium text-[var(--yt-text-primary)] leading-snug line-clamp-2">
-        {transcript.title}
-      </h3>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--yt-text-muted)]">
+              {LANGUAGE_LABELS[transcript.language] || transcript.language}
+            </p>
+            <h3 className="mt-2 line-clamp-2 text-base font-medium leading-snug text-[var(--yt-text-primary)]">
+              {transcript.title}
+            </h3>
+          </div>
 
-      {/* Channel Name */}
-      <p className="mt-1 text-xs text-[var(--yt-text-secondary)]">
-        {transcript.channel}
-      </p>
-      {transcript.playlistTitle && (
-        <p className="mt-1 text-[11px] text-[var(--yt-text-muted)] line-clamp-1">
-          {transcript.playlistTitle}
-        </p>
-      )}
+          <div className="relative flex-none" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setExportOpen((open) => !open)}
+              className="yt-icon-button"
+              aria-label="Export transcript"
+              title="Export transcript"
+            >
+              <Download size={15} />
+            </button>
 
-      {/* Transcript Preview */}
-      <p className="mt-2 text-xs text-[var(--yt-text-secondary)] leading-relaxed line-clamp-3 max-h-[80px] overflow-hidden">
-        {transcript.preview}
-      </p>
-
-      {/* Actions Row */}
-      <div className="mt-3 flex items-center justify-between">
-        {/* Language Tag */}
-        <span className="inline-block rounded-full bg-[var(--yt-bg-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--yt-text-secondary)]">
-          {LANGUAGE_LABELS[transcript.language] || transcript.language}
-        </span>
-
-        {/* Export Dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setExportOpen(!exportOpen)}
-            className="
-              h-7 px-3 bg-[var(--yt-bg-card)] border border-[var(--yt-border)] rounded-md
-              text-xs font-medium text-[var(--yt-text-primary)]
-              hover:border-[#1683ff] hover:text-[#1683ff]
-              transition-colors cursor-pointer
-            "
-            aria-label="Export transcript"
-          >
-            <span className="flex items-center gap-1">
-              Export
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </span>
-          </button>
-
-          {exportOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-[var(--yt-bg-card)] border border-[var(--yt-border)] rounded-lg shadow-[var(--yt-shadow-float)] py-1 min-w-[140px] z-10">
-              <button
-                onClick={handleExportTxt}
-                className="block w-full text-left px-4 py-2 text-sm text-[var(--yt-text-secondary)] hover:bg-[var(--yt-bg-subtle)] hover:text-[var(--yt-text-primary)] transition-colors cursor-pointer"
-                aria-label="Export transcript as text file"
-              >
-                Export as .txt
-              </button>
-              <button
-                onClick={handleExportSrt}
-                className="block w-full text-left px-4 py-2 text-sm text-[var(--yt-text-secondary)] hover:bg-[var(--yt-bg-subtle)] hover:text-[var(--yt-text-primary)] transition-colors cursor-pointer"
-                aria-label="Export transcript as SRT file"
-              >
-                Export as .srt
-              </button>
-            </div>
-          )}
+            {exportOpen && (
+              <div className="absolute right-0 top-full z-10 mt-2 min-w-[132px] rounded-lg border border-[var(--yt-border)] bg-[var(--yt-bg-page)] p-1 shadow-[var(--yt-shadow-float)]">
+                <button
+                  type="button"
+                  onClick={handleExportTxt}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm text-[var(--yt-text-secondary)] transition hover:bg-[var(--yt-bg-subtle)] hover:text-[var(--yt-text-primary)]"
+                  aria-label="Export transcript as text file"
+                >
+                  .txt
+                  <ChevronDown size={13} className="-rotate-90" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportSrt}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm text-[var(--yt-text-secondary)] transition hover:bg-[var(--yt-bg-subtle)] hover:text-[var(--yt-text-primary)]"
+                  aria-label="Export transcript as SRT file"
+                >
+                  .srt
+                  <ChevronDown size={13} className="-rotate-90" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        <p className="mt-2 truncate text-xs text-[var(--yt-text-secondary)]">{transcript.channel}</p>
+        {transcript.playlistTitle && (
+          <p className="mt-1 line-clamp-1 text-[11px] text-[var(--yt-text-muted)]">
+            {transcript.playlistTitle}
+          </p>
+        )}
+
+        <p className="mt-4 line-clamp-3 text-xs leading-relaxed text-[var(--yt-text-secondary)]">
+          {transcript.preview}
+        </p>
       </div>
-    </div>
+    </article>
   );
 }
